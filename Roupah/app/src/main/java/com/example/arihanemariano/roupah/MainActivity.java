@@ -2,9 +2,9 @@ package com.example.arihanemariano.roupah;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.os.StrictMode;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
-import android.util.Log;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -21,6 +21,8 @@ import java.net.URLConnection;
 
 public class MainActivity extends ActionBarActivity {
 
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -28,12 +30,15 @@ public class MainActivity extends ActionBarActivity {
         Firebase.setAndroidContext(this);
         Firebase.getDefaultConfig().setPersistenceEnabled(true);
 
+        StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
+        StrictMode.setThreadPolicy(policy);
+
         final TextView resul = (TextView) findViewById(R.id.result);
         String URL =  new ConnectionBase().getBase();
         Firebase base = new Firebase(URL);
         final StringBuilder finalResult = new StringBuilder();
 
-        ImageView img = (ImageView)findViewById(R.id.imageView);
+        final ImageView img = (ImageView)findViewById(R.id.imageView);
 
 
         base.child("img").addValueEventListener(new ValueEventListener() {
@@ -43,6 +48,8 @@ public class MainActivity extends ActionBarActivity {
             public void onDataChange(DataSnapshot snapshot) {
                 finalResult.append(snapshot.getValue());
                 resul.setText(finalResult);
+                Bitmap bitmap = DownloadImage(finalResult.toString());
+                img.setImageBitmap(bitmap);
 
             }
 
@@ -52,8 +59,7 @@ public class MainActivity extends ActionBarActivity {
 
         });
 
-        Bitmap bitmap = DownloadImage(finalResult.toString());
-        img.setImageBitmap(bitmap);
+
      }
     private InputStream OpenHttpConnection(String urlString) throws IOException {
         InputStream in = null;
@@ -67,6 +73,7 @@ public class MainActivity extends ActionBarActivity {
 
         try {
             HttpURLConnection httpConn = (HttpURLConnection) conn;
+            httpConn.setDoInput(true);
             httpConn.setAllowUserInteraction(false);
             httpConn.setInstanceFollowRedirects(true);
             httpConn.setRequestMethod("GET");
