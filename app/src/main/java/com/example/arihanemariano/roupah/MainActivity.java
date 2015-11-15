@@ -1,14 +1,12 @@
 package com.example.arihanemariano.roupah;
 
 import android.app.Activity;
-import android.app.ProgressDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
-import android.os.AsyncTask;
+import android.os.Environment;
 import android.os.StrictMode;
 import android.provider.MediaStore;
 import android.os.Bundle;
@@ -16,6 +14,7 @@ import android.util.Base64;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.GridView;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -25,10 +24,8 @@ import com.firebase.client.Firebase;
 import com.firebase.client.FirebaseError;
 import com.firebase.client.ValueEventListener;
 
-import org.apache.http.NameValuePair;
-import org.apache.http.message.BasicNameValuePair;
-
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -46,6 +43,10 @@ public class MainActivity extends Activity {
     String ba1;
     private Firebase base;
     Button btpic, btnup;
+    private GridView imageGrid;
+    private ArrayList<Bitmap> bitmapList;
+    private ArrayList<Roupa> roupas;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,10 +58,27 @@ public class MainActivity extends Activity {
         StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
         StrictMode.setThreadPolicy(policy);
 
+        this.imageGrid = (GridView) findViewById(R.id.gridview);
+        this.bitmapList = new ArrayList<Bitmap>();
+        this.roupas = new ArrayList<Roupa>();
+
+
         final TextView resul = (TextView) findViewById(R.id.result);
         String URL =  new ConnectionBase().getBase();
          base = new Firebase(URL);
         final StringBuilder finalResult = new StringBuilder();
+
+        File mediaFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),"myApp");
+        fileUri = Uri.fromFile(mediaFile);
+        if(!mediaFile.exists()){
+            if(!mediaFile.mkdir()){
+                Log.d("myApp","Couldn't create it");
+            }
+        }
+
+
+
+
 
         img = (ImageView)findViewById(R.id.imageView);
         btpic = (Button) findViewById(R.id.cpic);
@@ -80,15 +98,22 @@ public class MainActivity extends Activity {
         });
 
 
-        base.child("img").addValueEventListener(new ValueEventListener() {
+        base.addValueEventListener(new ValueEventListener() {
 
 
             @Override
             public void onDataChange(DataSnapshot snapshot) {
-                /*finalResult.append(snapshot.getValue());
-                resul.setText(finalResult);
-                Bitmap bitmap = DownloadImage(finalResult.toString());
-                img.setImageBitmap(bitmap);*/
+
+                for(DataSnapshot msgSnapshot: snapshot.getChildren()){
+                    Roupa roupa = msgSnapshot.getValue(Roupa.class);
+                    if(!roupas.contains(roupa)){
+                        roupas.add(roupa);
+                        byte[] decodeByte = Base64.decode(roupa.getImagem(),0);
+                        bitmapList.add(BitmapFactory.decodeByteArray(decodeByte,0,decodeByte.length));
+                    }
+
+                }
+                imageGrid.setAdapter(new ImageAdapter(MainActivity.this, bitmapList));
                 Toast.makeText(getApplication(), "It changed", Toast.LENGTH_LONG).show();
 
 
@@ -149,49 +174,32 @@ public class MainActivity extends Activity {
 
     protected void onActivityResult(int requestCode, int resultCode, Intent data){
         if(requestCode == 100 && resultCode == RESULT_OK){
+            Bitmap map = (Bitmap)data.getExtras().get("data");
+            Toast.makeText(this, "Image saved to: "+data.getExtras(), Toast.LENGTH_SHORT).show();
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            map.compress(Bitmap.CompressFormat.JPEG,90,bytes);
+
+            byte[] ba = bytes.toByteArray();
+            ba1 = Base64.encodeToString(ba, Base64.DEFAULT);
+
+            Log.e("path", "----" + ba1);
+
+            Roupa roupa = new Roupa(ba1, "teste","descri","cor");
+            base.push().setValue(roupa);
+
+            img.setImageBitmap(map);
 
             selectedImage = data.getData();
             photo = (Bitmap) data.getExtras().get("data");
 
 
-            String[] filePathComum ={MediaStore.Images.Media.DATA};
-            Cursor cursor = getContentResolver().query(selectedImage, filePathComum, null, null, null);
-            cursor.moveToFirst();
-
-            int columIndex = cursor.getColumnIndex(filePathComum[0]);
-            picturePath = cursor.getString(columIndex);
-
             Bitmap photo = (Bitmap) data.getExtras().get("data");
             img = (ImageView)findViewById(R.id.imageView);
             img.setImageBitmap(photo);
-
         }else{
             Toast.makeText(getApplication(), "Nothing happened", Toast.LENGTH_LONG).show();
         }
 
-        class UploadToServer extends AsyncTask<Void, Void, String>{
-            private ProgressDialog pd = new ProgressDialog(MainActivity.this);
-
-            protected void onPreExecute(){
-                super.onPreExecute();
-                pd.setMessage("Wait image upload!");
-                pd.show();
-            }
-
-
-
-            @Override
-            protected String doInBackground(Void... params) {
-
-                ArrayList<NameValuePair> nameValuePairs = new ArrayList<NameValuePair>();
-                nameValuePairs.add(new BasicNameValuePair("base64","b1"));
-                nameValuePairs.add(new BasicNameValuePair("imageName", System.currentTimeMillis()+".jpg"));
-
-
-
-                return null;
-            }
-        }
     }
 
 
